@@ -47,6 +47,13 @@ JPEG_QUALITY    = 95
 WINDOW_NAME     = "D415 | ESPACO=salvar  Q=sair"
 
 # ---------------------------------------------------------------------------
+# Otimizacoes de preview para CPUs fracas
+# ---------------------------------------------------------------------------
+PREVIEW_WAITKEY_MS  = 100   # intervalo do loop GUI (10 fps visuais). Aumente para aliviar mais CPU.
+PREVIEW_SCALE       = 0.5   # fator de redimensionamento do canvas (0.5 = metade da resolucao)
+DEPTH_VIS_EVERY_N   = 3     # recalcula colorize_depth so a cada N frames capturados
+
+# ---------------------------------------------------------------------------
 # Buffer compartilhado entre threads
 # ---------------------------------------------------------------------------
 _lock            = threading.Lock()
@@ -289,6 +296,10 @@ def run():
         return
 
     print(f"[INIT] Primeiro frame recebido! Iniciando preview.\n")
+    print(f"[INFO] Preview otimizado para CPU fraca:")
+    print(f"         - Loop visual a cada {PREVIEW_WAITKEY_MS} ms (~{1000//PREVIEW_WAITKEY_MS} fps)")
+    print(f"         - Canvas reduzido para {int(PREVIEW_SCALE*100)}% da resolucao original")
+    print(f"         - Depth colormap recalculado a cada {DEPTH_VIS_EVERY_N} frames\n")
 
     frame_counter = 0
 
@@ -322,10 +333,13 @@ def run():
 
 
 def _run_gui_loop(frame_counter):
-    """Loop principal com preview visual OpenCV."""
+    """Loop principal com preview visual OpenCV, otimizado para CPU fraca."""
+    _cached_depth_vis = None  # cache do ultimo colorize_depth calculado
+
     try:
         while True:
             with _lock:
+                frames_now = _frames_received
                 if _latest_color is not None:
                     color_snap = _latest_color.copy()
                     depth_snap = _latest_depth.copy()
@@ -333,14 +347,28 @@ def _run_gui_loop(frame_counter):
                     color_snap = None
 
             if color_snap is not None:
-                depth_vis = colorize_depth(depth_snap)
-                canvas    = np.hstack([color_snap, depth_vis])
-                label     = f"Salvos: {frame_counter}  |  ESPACO=salvar  Q=sair"
-                cv2.putText(canvas, label, (10, 28),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 255, 0), 2)
+                # Recalcula o colormap de profundidade apenas a cada DEPTH_VIS_EVERY_N frames
+                # capturados, evitando applyColorMap a todo tick do loop visual.
+                if _cached_depth_vis is None or (frames_now % DEPTH_VIS_EVERY_N == 0):
+                    _cached_depth_vis = colorize_depth(depth_snap)
+
+                canvas = np.hstack([color_snap, _cached_depth_vis])
+
+                # Redimensiona o canvas para aliviar a renderizacao X11/Qt
+                if PREVIEW_SCALE != 1.0:
+                    canvas = cv2.resize(
+                        canvas, (0, 0),
+                        fx=PREVIEW_SCALE, fy=PREVIEW_SCALE,
+                        interpolation=cv2.INTER_NEAREST  # mais rapido que INTER_LINEAR
+                    )
+
+                label = f"Salvos: {frame_counter}  |  ESPACO=salvar  Q=sair"
+                cv2.putText(canvas, label, (10, 22),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
                 cv2.imshow(WINDOW_NAME, canvas)
 
-            key = cv2.waitKey(30) & 0xFF
+            # PREVIEW_WAITKEY_MS > 30 reduz drasticamente o uso de CPU no loop GUI
+            key = cv2.waitKey(PREVIEW_WAITKEY_MS) & 0xFF
 
             if key in (ord('q'), ord('Q'), 27):
                 print("\n[RUN] Encerrando.")
