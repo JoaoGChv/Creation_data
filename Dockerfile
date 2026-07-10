@@ -13,12 +13,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         # USB access
         libusb-1.0-0 \
         udev \
-        # OpenCV GUI (GTK3 + X11)
+        # OpenCV GUI (GTK3 + X11 + Qt offscreen para modo headless)
         libgl1 \
         libglib2.0-0 \
         libgtk-3-0 \
         libgdk-pixbuf2.0-0 \
         libxcb-xinerama0 \
+        libqt5gui5 \
     && rm -rf /var/lib/apt/lists/*
 
 # ─── Dependências Python ──────────────────────────────────────────────────────
@@ -36,8 +37,8 @@ RUN mkdir -p /app/output
 VOLUME ["/app/output"]
 
 # ─── GUI via X11 (passthrough do host) ───────────────────────────────────────
-ENV QT_QPA_PLATFORM=xcb
-ENV DISPLAY=:0
+# QT_QPA_PLATFORM e DISPLAY são definidos em docker-run.sh conforme ambiente
+ENV QT_QPA_PLATFORM=offscreen
 
 # ─── Entrypoint ───────────────────────────────────────────────────────────────
 ENTRYPOINT ["python3", "realsense_capture.py"]

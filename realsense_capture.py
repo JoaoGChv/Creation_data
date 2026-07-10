@@ -26,7 +26,7 @@ import json
 import argparse
 from datetime import datetime
 
-os.environ["QT_QPA_PLATFORM"]          = "xcb"
+os.environ.setdefault("QT_QPA_PLATFORM", "xcb")
 os.environ["OPENCV_IO_ENABLE_OPENEXR"] = "0"
 os.environ["QT_LOGGING_RULES"]         = "*.debug=false;qt.qpa.*=false"
 
@@ -190,6 +190,8 @@ def build_pipeline(bag_path=None):
     config.enable_stream(rs.stream.depth, WIDTH, HEIGHT, rs.format.z16,  FPS)
 
     if bag_path:
+        if not bag_path.endswith(".db3"):
+            bag_path = os.path.splitext(bag_path)[0] + ".db3"
         config.enable_record_to_file(bag_path)
         print(f"[BAG] Gravando em: {bag_path}")
 
@@ -602,7 +604,6 @@ def parse_args():
 if __name__ == "__main__":
     args = parse_args()
 
-    global OUTPUT_DIR
     OUTPUT_DIR = args.output
 
     try:

@@ -22,10 +22,17 @@ DOCKER_FLAGS=(
     --privileged
     -v /dev/bus/usb:/dev/bus/usb
     -v "${OUTPUT_DIR}:/app/output"
-    # GUI via X11 (comente as duas linhas abaixo se não quiser janela de preview)
-    -e DISPLAY="${DISPLAY:-:0}"
-    -v /tmp/.X11-unix:/tmp/.X11-unix
 )
+
+# Adiciona X11 só se houver display real disponível; senão roda headless
+if [[ -n "${DISPLAY:-}" ]] && [[ -S "/tmp/.X11-unix/X${DISPLAY#:}" ]]; then
+    DOCKER_FLAGS+=(
+        -e DISPLAY="${DISPLAY}"
+        -v /tmp/.X11-unix:/tmp/.X11-unix
+    )
+else
+    DOCKER_FLAGS+=(-e QT_QPA_PLATFORM=offscreen)
+fi
 
 # Permite conexão X11 do container (executa no host, não dentro do Docker)
 allow_x11() {
