@@ -391,7 +391,13 @@ def _run_terminal_loop(frame_counter):
         while True:
             ready, _, _ = select.select([sys.stdin], [], [], 0.1)
             if ready:
-                cmd = sys.stdin.readline().strip().lower()
+                line = sys.stdin.readline()
+                if line == '':
+                    # stdin em EOF (sem terminal interativo) — sem isso, o loop
+                    # entra em modo "ready" permanente e salva frames sem parar.
+                    print("\n[ERRO] stdin fechado/EOF — rode o container com 'docker run -it'.")
+                    break
+                cmd = line.strip().lower()
                 if cmd == 'q':
                     print("\n[RUN] Encerrando.")
                     break

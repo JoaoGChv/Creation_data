@@ -24,6 +24,14 @@ DOCKER_FLAGS=(
     -v "${OUTPUT_DIR}:/app/output"
 )
 
+# stdin interativo é necessário para o modo ESPAÇO/ENTER=salvar (sem isso o
+# stdin fica em EOF e o loop de captura tenta salvar frames sem parar)
+if [[ -t 0 ]]; then
+    DOCKER_FLAGS+=(-it)
+else
+    DOCKER_FLAGS+=(-i)
+fi
+
 # Adiciona X11 só se houver display real disponível; senão roda headless
 if [[ -n "${DISPLAY:-}" ]] && [[ -S "/tmp/.X11-unix/X${DISPLAY#:}" ]]; then
     DOCKER_FLAGS+=(
